@@ -227,6 +227,7 @@ function tholdlists_import_form_actions() {
 
 	html_start_box($import_actions{get_nfilter_request_var('drp_action')}, '60%', '', '3', 'center', '');
 
+	$save_html = '';
 	if (isset($import_array)) {
 		if (get_nfilter_request_var('drp_action') === THOLDLISTS_ACTION_DUPLICATE) { /* duplicate */
 			print "	<tr>
@@ -255,7 +256,7 @@ function tholdlists_import_form_actions() {
 				</tr>\n";
 
 			$save_html = "<input type='button' value='" . __esc('Cancel', 'tholdlists') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue', 'tholdlists') . "' title='" . __esc('Disable Notification List Import(s)', 'tholdlists') . "'>";
-		} elseif (get_nfilter_request_var('drp_action') === THOLD_ACTIONS_LIST_ENABLE) { /* enable */
+		} elseif (get_nfilter_request_var('drp_action') === THOLDLISTS_ACTIONS_LIST_ENABLE) { /* enable */
 			print "	<tr>
 					<td class='topBoxAlt'>
 						<p>" . __n('Click \'Continue\' to enable the following Notification List Import.', 'Click \'Continue\' to enable following Notification List Imports.', sizeof($import_array), 'tholdlists') . "</p>
@@ -264,7 +265,7 @@ function tholdlists_import_form_actions() {
 				</tr>\n";
 
 			$save_html = "<input type='button' value='" . __esc('Cancel', 'tholdlists') . "' onClick='cactiReturnTo()'>&nbsp;<input type='submit' value='" . __esc('Continue', 'tholdlists') . "' title='" . __esc('Enable Notification List Import(s)', 'tholdlists') . "'>";
-		} elseif (get_nfilter_request_var('drp_action') === THOLD_ACTION_LISTS_IMPORT) { /* import now */
+		} elseif (get_nfilter_request_var('drp_action') === THOLDLISTS_ACTION_LISTS_IMPORT) { /* import now */
 			print "	<tr>
 					<td class='topBoxAlt'>
 						<p>" . __n('Click \'Continue\' to run the following Notification List Import now.', 'Click \'Continue\' to run following Notification List Imports now.', sizeof($import_array)) . "</p>
