@@ -462,10 +462,9 @@ function plugin_tholdlists_import_list(&$import) {
 					if (sizeof($bad_graph_ids)) {
 						plugin_tholdlists_log('WARNING: ' . $log_row . ' Invalid Graph ID\'s found, skipped');
 					} elseif (sizeof($graph_ids)) {
-						$tholds = db_fetch_assoc_prepared('SELECT id, name, local_graph_id, notify_alert FROM thold_data
-							WHERE local_graph_id IN (?)
-							ORDER BY local_graph_id, name',
-							array(implode(',',$graph_ids)));
+						$tholds = db_fetch_assoc('SELECT id, name, local_graph_id, notify_alert FROM thold_data
+							WHERE local_graph_id IN (' . implode(',',$graph_ids) .')
+							ORDER BY local_graph_id, name');
 
 						plugin_tholdlists_log('DEBUG: ' . $log_row . ' Found ' . sizeof($tholds) .' thresholds to update');
 						if (sizeof($tholds)) {
