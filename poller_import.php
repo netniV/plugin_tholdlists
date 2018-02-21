@@ -101,12 +101,7 @@ if (sizeof($parms)) {
 	}
 }
 
-/* graph export */
-if (isset($thread)) {
-	import_list_start_task($thread);
-} else {
-	import_list_start($id, $force);
-}
+tholdlists_import_list_start($id, $force);
 
 /*  display_version - displays version information */
 function display_version() {

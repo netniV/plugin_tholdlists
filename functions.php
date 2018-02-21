@@ -87,7 +87,7 @@ function tholdlists_calc_next_start($import, $start_time = 0) {
    and some thought should be given to making multi-threaded.
    @arg $id    - the id of the export to check, '0' for all export definitions.
    @arg $force - force the export to run no regardless of it's timing settings. */
-function import_list_start($id = 0, $force = false) {
+function tholdlists_import_list_start($id = 0, $force = false) {
 	global $debug, $start;
 
 	/* take time to log performance data */
@@ -138,7 +138,7 @@ function import_list_start($id = 0, $force = false) {
 			if ($runnow) {
 				$started_imports++;
 				plugin_tholdlists_log('DEBUG: Running Import for id ' . $import['id']);
-				run_import($import);
+				tholists_run_import($import);
 			}
 		}
 	}
@@ -155,7 +155,7 @@ function import_list_start($id = 0, $force = false) {
    config, to sanitize directories, and transfer data to the remote
    host(s).
    @arg $import   - the export item structure. */
-function run_import(&$import) {
+function tholdlists_run_import(&$import) {
 	global $config, $import_file;
 
 	$imported = 0;
@@ -178,15 +178,15 @@ function run_import(&$import) {
 
 	db_execute_prepared('UPDATE mbv_thold_lists SET import_pid = 0 WHERE id = ?', array($import['id']));
 
-	config_import_stats($import, $imported);
+	tholdlists_import_stats($import, $imported);
 }
 
-/* config_import_stats - a function to export stats to the Cacti system for information
+/* tholdlists_import_stats - a function to export stats to the Cacti system for information
    and possible graphing. It uses a global variable to get the start time of the
    export process.
    @arg $import   - the export item structure
    @arg $imported - the number of graphs exported. */
-function config_import_stats(&$import, $imported) {
+function tholdlists_import_stats(&$import, $imported) {
 	global $start;
 	/* take time to log performance data */
 	$end = microtime(true);
@@ -269,12 +269,12 @@ function plugin_tholdlists_fatal(&$import, $stMessage) {
 	exit;
 }
 
-/* check_cacti_paths - this function is looking for bad export paths that
+/* tholdlists_check_cacti_paths - this function is looking for bad export paths that
    can potentially get the user in trouble.  We avoid paths that can
    get erased by accident.
    @arg $import       - the export item structure
    @arg $import_file  - the directory holding the export contents. */
-function check_cacti_paths(&$import, $import_file) {
+function tholdlists_check_cacti_paths(&$import, $import_file) {
 	global $config;
 
 	$root_path = $config['base_path'];
@@ -312,7 +312,7 @@ function check_cacti_paths(&$import, $import_file) {
 
 }
 
-function check_system_paths(&$import, $import_file) {
+function tholdlists_check_system_paths(&$import, $import_file) {
 	/* don't allow to export to system paths */
 	$system_paths = array(
 		'/boot',
@@ -353,8 +353,8 @@ function plugin_tholdlists_import_list(&$import) {
 	$import_file = $import['import_file'];
 
 	/* check for bad directories */
-	check_cacti_paths($import, $import_file);
-	check_system_paths($import, $import_file);
+	tholdlists_check_cacti_paths($import, $import_file);
+	tholdlists_check_system_paths($import, $import_file);
 
 	if (strlen($import_file) < 3) {
 		plugin_tholdlists_fatal($import, "Import path is not long enough ! Import can not continue. ");
