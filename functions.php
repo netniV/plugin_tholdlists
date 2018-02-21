@@ -199,7 +199,7 @@ function tholdlists_import_stats(&$import, $imported) {
 
 	/* insert poller stats into the settings table */
 	db_execute_prepared('UPDATE mbv_thold_lists
-		SET last_runtime = ?, total_lists = ?, last_ended=NOW(), status=0
+		SET last_runtime = ?, total_items = ?, last_ended=NOW(), status=0
 		WHERE id = ?',
 		array($end - $start, $imported, $import['id']));
 
