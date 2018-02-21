@@ -491,10 +491,9 @@ function plugin_tholdlists_import_list(&$import) {
 										'Updating ' . $list_name . ' thresholds (IDs: ' .
 										implode(',', $thold_ids) . ')');
 
-									db_execute_prepared('UPDATE thold_data
-										SET ' . $list_field . ' = ?
-										WHERE id in (?)',
-										array($list_id, implode(',',$thold_ids)));
+									db_execute('UPDATE thold_data
+										SET ' . $list_field . ' = ' . $list_id .'
+										WHERE id in (' . implode(',',$thold_ids) .')');
 								} else {
 									plugin_tholdlists_log('WARNING: ' . $log_row . ' -> ' .
 										'Skipped ' . $list_name . ' thresholds (IDs: ' .
