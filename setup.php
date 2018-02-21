@@ -17,8 +17,9 @@
  +-------------------------------------------------------------------------+
 */
 
+include_once(dirname(__FILE__).'/functions.php');
+
 function plugin_tholdlists_install() {
-	# graph setup all arrays needed for automation
 	api_plugin_register_hook('tholdlists', 'config_arrays',        'tholdlists_config_arrays',        'setup.php');
 	api_plugin_register_hook('tholdlists', 'draw_navigation_text', 'tholdlists_draw_navigation_text', 'setup.php');
 	api_plugin_register_hook('tholdlists', 'poller_bottom',        'tholdlists_poller_bottom',        'setup.php');
@@ -73,6 +74,8 @@ function tholdlists_check_upgrade() {
 	$current = $info['version'];
 	$old     = db_fetch_cell("SELECT version FROM plugin_config WHERE directory='tholdlists'");
 
+
+	tholdlists_create_table();
 	if ($current != $old) {
 		if (api_plugin_is_enabled('tholdlists')) {
 			# may sound ridiculous, but enables new hooks
@@ -118,6 +121,8 @@ function tholdlists_create_table() {
 			`import_hourly` varchar(20) DEFAULT '',
 			`import_daily` varchar(20) DEFAULT '',
 			`import_clear` char(3) DEFAULT '',
+			`import_thold` char(3) DEFAULT '',
+			`import_type` int(10) unsigned DEFAULT '0',
 			`status` int(10) unsigned DEFAULT '0',
 			`import_pid` int(10) unsigned DEFAULT NULL,
 			`next_start` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
@@ -132,11 +137,25 @@ function tholdlists_create_table() {
 			ENGINE=InnoDB
 			COMMENT='Stores THold Notification List Import Settings for Cacti'");
 	}
+
+	if (!db_table_exists('mbv_thold_lists_contacts')) {
+		db_execute("CREATE TABLE `mbv_thold_lists_contacts` (
+			`id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+			`tholdlist_id` int(10) unsigned NOT NULL DEFAULT '0',
+			`list_id` int(10) unsigned NOT NULL DEFAULT '0',
+			`name` varchar(255) DEFAULT '',
+			`graph_ids` varchar(4000) DEFAULT '',
+			`date_imported` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+			`date_inserted` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+			PRIMARY KEY (`id`))
+			ENGINE=InnoDB
+			COMMENT='Stores THoldList Contacts, links to list and groups'");
+	}
 	return true;
 }
 
 function tholdlists_config_arrays() {
-	global $menu, $fields_tholdlists_import_edit, $messages, $config;
+	global $menu, $fields_tholdlists_import_edit, $messages, $config, $tholdlists_import_type_names;
 
 	/* perform database upgrade, if required */
 	tholdlists_check_upgrade();
@@ -165,7 +184,7 @@ function tholdlists_config_arrays() {
 		'tholdlists_hdr_general' => array(
 			'friendly_name' => __('General', 'tholdlists'),
 			'collapsible' => 'true',
-			'method' => 'spacer',
+			'method' => 'spacer'
 		),
 		'name' => array(
 			'friendly_name' => __('Notification List Import Name', 'tholdlists'),
@@ -181,18 +200,31 @@ function tholdlists_config_arrays() {
 			'description' => __('Check this Checkbox if you wish this notification list import to be enabled.', 'tholdlists'),
 			'value' => '|arg1:enabled|',
 			'default' => 'on',
-			'method' => 'checkbox',
+			'method' => 'checkbox'
 		),
-		'clear' => array(
+		'import_clear' => array(
 			'friendly_name' => __('Clear', 'tholdlists'),
 			'description' => __('Check this Checkbox if you wish to clear matching notification lists during import.', 'tholdlists'),
 			'value' => '|arg1:import_clear|',
-			'method' => 'checkbox',
+			'method' => 'checkbox'
 		),
 		'import_hdr_paths' => array(
-			'friendly_name' => __('Import Location Information', 'tholdlists'),
+			'friendly_name' => __('Import Information', 'tholdlists'),
 			'collapsible' => 'true',
-			'method' => 'spacer',
+			'method' => 'spacer'
+		),
+		'import_thold' => array(
+			'friendly_name' => __('Update Threshold', 'tholdlists'),
+			'description' => __('Check this Checkbox if you wish to update matching thresholds during import.', 'tholdlists'),
+			'value' => '|arg1:import_thold|',
+			'method' => 'checkbox'
+		),
+		'import_type' => array(
+			'friendly_name' => __('Import Field', 'tholdlists'),
+			'description' => __('This is the field to update on the Threshold, it will be set to the imported notification list','tholdlists'),
+			'method' => 'drop_array',
+			'value' => '|arg1:import_type|',
+			'array' => $tholdlists_import_type_names
 		),
 		'import_file' => array(
 			'friendly_name' => __('Import File', 'tholdlists'),
@@ -210,7 +242,7 @@ function tholdlists_config_arrays() {
 		),
 		'import_hdr_timing' => array(
 			'friendly_name' => __('Import Timing', 'tholdlists'),
-			'method' => 'spacer',
+			'method' => 'spacer'
 		),
 		'import_timing' => array(
 			'friendly_name' => __('Timing Method', 'tholdlists'),
@@ -222,7 +254,7 @@ function tholdlists_config_arrays() {
 				'periodic' => __('Periodic', 'tholdlists'),
 				'hourly' => __('Hourly', 'tholdlists'),
 				'daily' => __('Daily', 'tholdlists')
-			),
+			)
 		),
 		'import_skip' => array(
 			'friendly_name' => __('Periodic Import Cycle', 'tholdlists'),
@@ -242,7 +274,7 @@ function tholdlists_config_arrays() {
 				10 => __('Every %d Polling Cycles', 10, 'tholdlists'),
 				11 => __('Every %d Polling Cycles', 11, 'tholdlists'),
 				12 => __('Every %d Polling Cycles', 12, 'tholdlists')
-			),
+			)
 		),
 		'import_hourly' => array(
 			'friendly_name' => __('Hourly at specified minutes', 'tholdlists'),
@@ -263,7 +295,7 @@ function tholdlists_config_arrays() {
 			'default' => '00:00',
 			'max_length' => '10',
 			'size' => '5'
-		),
+		)
 	);
 }
 

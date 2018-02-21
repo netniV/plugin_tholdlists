@@ -21,6 +21,27 @@
  | http://www.cacti.net/                                                   |
  +-------------------------------------------------------------------------+
 */
+global $tholdlists_import_type_fields;
+global $tholdlists_import_type_names;
+
+$tholdlists_import_type_fields = array(0 => 'notify_alert', 1 => 'notify_warning');
+$tholdlists_import_type_names = array(0 => 'Alert', 1 => 'Warning');
+
+function get_tholdlists_list_field($list_type) {
+	global $tholdlists_import_type_fields;
+	if (!isset($list_type) || !is_numeric($list_type)) {
+		$list_type = 0;
+	}
+	return array_key_exists($list_type, $tholdlists_import_type_fields) ? ($tholdlists_import_type_fields[$list_type]) : ('unknown_field_'.$list_type);
+}
+
+function get_tholdlists_list_name($list_type) {
+	global $tholdlists_import_type_names;
+	if (!isset($list_type) || !is_numeric($list_type)) {
+		$list_type = 0;
+	}
+	return array_key_exists($list_type, $tholdlists_import_type_names) ? ($tholdlists_import_type_names[$list_type]) : ('Unknown Type '.$list_type);
+}
 
 function tholdlists_calc_next_start($import, $start_time = 0) {
 	if ($start_time == 0) $start_time = time();
@@ -349,6 +370,7 @@ function plugin_tholdlists_import_list(&$import) {
 
 	$import_id     = $import['id'];
 	$import_prefix = $import['import_prefix'];
+	$import_time   = time();
 
 	$handle = @fopen($import_file, "r");
 	$imported = 0;
@@ -356,54 +378,132 @@ function plugin_tholdlists_import_list(&$import) {
 		plugin_tholdlists_log("DEBUG: Successfully opened '$import_file'");
 		while (($line = fgets($handle)) !== false) {
 			$imported++;
+			$log_row = 'Row ' . sprintf('%4s', $imported) . ' -';
+
 			$line = str_replace("\n","",$line);
 			if (!isset($header)) {
 				$header = $line;
 				if (strcasecmp('Name|Email|Graphs', $header) !== 0) {
-					plugin_tholdlists_log('ERROR: Import aborted as Header ('. $header .') does not match expecations');
+					plugin_tholdlists_log('ERROR: ' . $log_row .' Import aborted as Header ('. $header .') does not match expecations');
 					break;
 				}
+
+				if ($import['import_clear'] == 'on') {
+					$notify_lists = db_fetch_assoc('SELECT * FROM plugin_notification_lists
+						WHERE name LIKE (\'%$import_prefix%)\'');
+
+					if (sizeof($notify_lists)) {
+						foreach ($notify_lists as $notify_list) {
+							plugin_tholdlists_log('DEBUG: ' . $log_row . ' Would remove \'' . $notify_list['name'] . '\' (' . $notify_list['id'] . ')');
+						}
+					}
+
+					db_execute('TRUNCATE TABLE mbv_thold_lists_contacts');
+				}
+
+
 			} else {
 				$data = explode("|",$line);
 				if (sizeof($data) != 3) {
-					plugin_tholdlists_log('ERROR: Row ' . $imported . ' has wrong number of elements: '. sizeof($data));
+					plugin_tholdlists_log('ERROR: ' . $log_row . ' has wrong number of elements: '. sizeof($data));
 				} else {
 					$notify_name = $data[0];
 					$notify_emails = $data[1];
-					$notify_graphs = explode(",",$data[2]);
+					$notify_graphs = $data[2];
 
-					$import_full = $import_prefix . ' ' . $notify_name;
+					$import_full = trim($import_prefix) . ' ' . $notify_name;
 
-					plugin_tholdlists_log('DEBUG: Importing row ' . $imported . ' - ' . $notify_name . ' as ' . $import_full);
-					$notify_lists = db_fetch_assoc_prepared('SELECT * FROM plugin_notification_lists
+					$notify_list = db_fetch_row_prepared('SELECT * FROM plugin_notification_lists
 						WHERE name = ?',
 						array($import_prefix . ' ' . $notify_name));
 
-					if ($import['import_clear'] == 'on') {
-						$ids = array();
-						foreach ($notify_lists as $notify_list) {
-							$ids[] = $notify_list['id'];
-						}
-
-						plugin_tholdlists_log('DEBUG: Would remove rows with ids ' . implode(',',$ids));
-						$notify_lists = array();
-					}
-
 					$list_id = 0;
-					if (sizeof($notify_lists)) {
+					if (sizeof($notify_list)) {
 						db_execute_prepared('UPDATE plugin_notification_lists
 							SET emails = ?, description = ?
 							WHERE name = ?',
 							array($notify_emails, 'Import of ' . $notify_name, $import_full));
-						$list_id = $notify_lists[0]['id'];
+
+						$list_id = $notify_list['id'];
 					} else {
 						db_execute_prepared('INSERT INTO plugin_notification_lists (name, emails, description)
 							VALUES (?, ?, ?)',
 							array($import_full, $notify_emails, 'Import of ' . $notify_name));
+
 						$list_id = db_fetch_insert_id();
 					}
 
 					$imported++;
+
+					$log = 'NOTICE: ';
+					$log .= $log_row . ' ';
+					$log .= (sizeof($notify_list) ? 'Updated' : 'Created');
+					$log .= ' notification list \'';
+					$log .= $import_full;
+					$log .= '\' (';
+					$log .= $list_id;
+					$log .= ')';
+					plugin_tholdlists_log($log);
+
+					db_execute_prepared('INSERT INTO mbv_thold_lists_contacts (tholdlist_id, list_id, name, graph_ids, date_imported, date_inserted)
+						VALUES (?, ?, ?, ?, ?, ?)',
+						array($import_id, $list_id, $notify_name, $notify_graphs, $import_time, time()));
+
+					$graph_ids = array();
+					$bad_graph_ids = array();
+					foreach (explode(',', $notify_graphs) as $graph_id) {
+						if (is_numeric($graph_id)) {
+							$graph_ids[] = $graph_id;
+						} else {
+							$bad_graph_ids[] = $graph_id;
+						}
+					}
+
+					if (sizeof($bad_graph_ids)) {
+						plugin_tholdlists_log('WARNING: ' . $log_row . ' Invalid Graph ID\'s found, skipped');
+					} elseif (sizeof($graph_ids)) {
+						$tholds = db_fetch_assoc_prepared('SELECT id, name, local_graph_id, notify_alert FROM thold_data
+							WHERE local_graph_id IN (?)
+							ORDER BY local_graph_id, name',
+							array(implode(',',$graph_ids)));
+
+						plugin_tholdlists_log('DEBUG: ' . $log_row . ' Found ' . sizeof($tholds) .' thresholds to update');
+						if (sizeof($tholds)) {
+							$local_graph_id = -1;
+							$thold_ids = array();
+							foreach ($tholds as $thold) {
+								if ($local_graph_id != $thold['local_graph_id']) {
+									$local_graph_id = $thold['local_graph_id'];
+									plugin_tholdlists_log('DEBUG: ' . $log_row . ' Processing Graph ' . $local_graph_id);
+								}
+
+								if ($thold['notify_alert'] != $list_id) {
+									plugin_tholdlists_log('DEBUG: ' . $log_row . ' -> ' . $thold['name'] . ' (ID: ' . $thold['id'] .')');
+									$thold_ids[] = $thold['id'];
+								}
+							}
+
+							if (sizeof($thold_ids)) {
+								$list_field = get_tholdlists_list_field($import['import_type']);
+								$list_name = get_tholdlists_list_name($import['import_type']);
+
+								if ($import['import_thold'] == 'on') {
+									plugin_tholdlists_log('WARNING: ' . $log_row . ' -> ' .
+										'Updating ' . $list_name . ' thresholds (IDs: ' .
+										implode(',', $thold_ids) . ')');
+
+									db_execute_prepared('UPDATE thold_data
+										SET ' . $list_field . ' = ?
+										WHERE id in (?)',
+										array($list_id, implode(',',$thold_ids)));
+								} else {
+									plugin_tholdlists_log('WARNING: ' . $log_row . ' -> ' .
+										'Skipped ' . $list_name . ' thresholds (IDs: ' .
+										implode(',', $thold_ids) . ')');
+								}
+							}
+						}
+					}
 				}
 			}
     		}

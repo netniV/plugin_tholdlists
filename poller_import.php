@@ -17,6 +17,7 @@
  | https://www.github.com/netniv/plugin_tholdlists                         |
  +-------------------------------------------------------------------------+
 */
+error_reporting(E_ALL);
 
 /* we are not talking to the browser */
 $no_http_headers = true;
@@ -73,6 +74,15 @@ if (sizeof($parms)) {
 		case '--force':
 			$force = TRUE;
 			break;
+		case '--setup-db':
+			display_version();
+			include_once($config['base_path'] . '/plugins/tholdlists/setup.php');
+			if (!function_exists('tholdlists_setup_table')) {
+				echo 'Mising function tholdlists_setup_table()';
+			} else {
+				tholdlists_setup_table();
+			}
+			exit;
 		case '--version':
 		case '-V':
 		case '-v':

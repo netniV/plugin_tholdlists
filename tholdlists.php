@@ -80,6 +80,7 @@ function tholdlists_import_form_save() {
 		$save['name']                    = form_input_validate(get_nfilter_request_var('name'), 'name', '', false, 3);
 		$save['enabled']                 = isset_request_var('enabled') ? 'on':'';
 		$save['import_clear']            = isset_request_var('import_clear') ? 'on':'';
+		$save['import_thold']            = isset_request_var('import_thold') ? 'on':'';
 		$save['import_file']             = form_input_validate(get_nfilter_request_var('import_file'), 'import_file', '', false, 3);
 		$save['import_prefix']           = form_input_validate(get_nfilter_request_var('import_prefix'), 'import_prefix', '', false, 3);
 		$save['import_timing']           = form_input_validate(get_nfilter_request_var('import_timing'), 'import_timing', '^periodic|hourly|daily$', false, 3);
@@ -137,7 +138,7 @@ function tholdlists_import_duplicate($import_id, $import_title) {
    ------------------------ */
 
 function tholdlists_import_form_actions() {
-	global $import_actions;
+	global $import_actions, $tholdlists_import_type_names, $tholdlists_import_type_fields;
 
 	/* if we are to save this form, instead of display it */
 	if (isset_request_var('selected_items')) {
@@ -346,7 +347,7 @@ function tholdlists_import_runnow($import_id) {
 }
 
 function tholdlists_import_edit() {
-	global $fields_tholdlists_import_edit;
+	global $fields_tholdlists_import_edit, $tholdlists_import_type_fields, $tholdlists_import_type_names;
 
 	/* ================= input validation ================= */
 	get_filter_request_var('id');
@@ -363,6 +364,7 @@ function tholdlists_import_edit() {
 
 	html_start_box($header_label, '100%', '', '3', 'center', '');
 
+	echo "<!-- Edit Fields: " . var_export($fields_tholdlists_import_edit, true) . " -->";
 	draw_edit_form(
 		array(
 			'config' => array('no_form_tag' => true),
@@ -569,7 +571,9 @@ function tholdlists($refresh = true) {
 		'id' => array('display' => __('ID', 'tholdlists'), 'align' => 'right', 'sort' => 'ASC', 'tip' => __('The internal ID of the Notification List Import.', 'tholdlists')),
 		'import_timing' => array('display' => __('Schedule', 'tholdlists'), 'align' => 'right', 'sort' => 'DESC', 'tip' => __('The frequency that Lists will be imported.', 'tholdlists')),
 		'next_start' => array('display' => __('Next Start', 'tholdlists'), 'align' => 'right', 'sort' => 'ASC', 'tip' => __('The next time the Notification List Imports should run.', 'tholdlists')),
-		'nosort' => array('display' => __('Enabled', 'tholdlists'), 'align' => 'right', 'tip' => __('If enabled, this Notification List Import will run as required.', 'tholdlists')),
+		'enabled' => array('display' => __('Enabled', 'tholdlists'), 'align' => 'right', 'tip' => __('If enabled, this Notification List Import will run as required.', 'tholdlists')),
+		'cleared' => array('display' => __('Cleared', 'tholdlists'), 'align' => 'right', 'tip' => __('If enabled, this Notification List Import will clear as required.', 'tholdlists')),
+		'thresholds' => array('display' => __('Thresholds', 'tholdlists'), 'align' => 'right', 'tip' => __('If enabled, this Notification List Import will update Thresholds as required.', 'tholdlists')),
 		'status' => array('display' => __('Status', 'tholdlists'), 'align' => 'right', 'tip' => __('The current Notification List Import Status.', 'tholdlists')),
 
 		'last_runtime' => array('display' => __('Last Runtime', 'tholdlists'), 'align' => 'right', 'sort' => 'ASC', 'tip' => __('The last runtime for the Notification List Import.', 'tholdlists')),
@@ -606,6 +610,8 @@ function tholdlists($refresh = true) {
 			form_selectable_cell($import['enabled'] == '' ? __('N/A', 'tholdlists'):substr($import['next_start'], 5, 11), $import['id'], '', 'text-align:right');
 
 			form_selectable_cell($import['enabled'] == '' ? __('No', 'tholdlists'):__('Yes', 'tholdlists'), $import['id'], '', 'text-align:right');
+			form_selectable_cell($import['import_clear'] == '' ? __('No', 'tholdlists'):__('Yes', 'tholdlists'), $import['id'], '', 'text-align:right');
+			form_selectable_cell($import['import_thold'] == '' ? __('No', 'tholdlists'):__('Yes', 'tholdlists'), $import['id'], '', 'text-align:right');
 
 			switch($import['status']) {
 			case '0':
@@ -621,7 +627,6 @@ function tholdlists($refresh = true) {
 
 			if ($import['last_started'] != '0000-00-00 00:00:00') {
 				form_selectable_cell(round($import['last_runtime'],2) . ' ' . __('Sec', 'tholdlists'), $import['id'], '', 'text-align:right');
-				form_selectable_cell(number_format_i18n($import['total_graphs']), $import['id'], '', 'text-align:right');
 				form_selectable_cell(substr($import['last_started'], 5, 11), $import['id'], '', 'text-align:right');
 
 				if ($import['last_errored'] != '0000-00-00 00:00:00') {
