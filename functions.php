@@ -395,6 +395,15 @@ function plugin_tholdlists_import_list(&$import) {
 					if (sizeof($notify_lists)) {
 						foreach ($notify_lists as $notify_list) {
 							plugin_tholdlists_log('DEBUG: ' . $log_row . ' Would remove \'' . $notify_list['name'] . '\' (' . $notify_list['id'] . ')');
+
+							db_execute('DELETE FROM plugin_notification_lists WHERE ' . array_to_sql_or($selected_items, 'id'));
+							db_execute('UPDATE host SET thold_send_email = 0 WHERE thold_send_email = 2 AND ' . array_to_sql_or($selected_items, 'thold_host_email'));
+							db_execute('UPDATE host SET thold_send_email = 1 WHERE thold_send_email = 3 AND ' . array_to_sql_or($selected_items, 'thold_host_email'));
+							db_execute('UPDATE host SET thold_host_email = 0 WHERE ' . array_to_sql_or($selected_items, 'thold_host_email'));
+							db_execute('UPDATE thold_data SET notify_warning = 0 WHERE ' . array_to_sql_or($selected_items, 'notify_warning'));
+							db_execute('UPDATE thold_data SET notify_alert = 0 WHERE ' . array_to_sql_or($selected_items, 'notify_alert'));
+							db_execute('UPDATE thold_template SET notify_warning = 0 WHERE ' . array_to_sql_or($selected_items, 'notify_warning'));
+							db_execute('UPDATE thold_template SET notify_alert = 0 WHERE ' . array_to_sql_or($selected_items, 'notify_alert'));
 						}
 					}
 
@@ -415,7 +424,7 @@ function plugin_tholdlists_import_list(&$import) {
 
 					$notify_list = db_fetch_row_prepared('SELECT * FROM plugin_notification_lists
 						WHERE name = ?',
-						array($import_prefix . ' ' . $notify_name));
+						array($import_full));
 
 					$list_id = 0;
 					if (sizeof($notify_list)) {
