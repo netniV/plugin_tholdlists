@@ -138,7 +138,7 @@ function tholdlists_import_list_start($id = 0, $force = false) {
 			if ($runnow) {
 				$started_imports++;
 				plugin_tholdlists_log('DEBUG: Running Import for id ' . $import['id']);
-				tholists_run_import($import);
+				tholdlists_run_import($import);
 			}
 		}
 	}
